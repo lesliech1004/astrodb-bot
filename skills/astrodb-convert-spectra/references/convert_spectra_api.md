@@ -49,6 +49,26 @@ Accepts a **path/URL string or a `Spectrum` object**. Checks, in order:
 Returns `True`/`False` with `raise_error=False`; raises `AstroDBError` otherwise.
 Use it twice: on the in-memory `Spectrum` before writing, and on the written path after.
 
+**Gotcha (bug in 1.1.0):** for a path it **cannot read**, `raise_error=False` does not return
+`False`. It raises `UnboundLocalError`. Always wrap it (`is_plottable()` in the template).
+The keyword is `raise_error`; `raise_errors` raises `TypeError`.
+
+---
+
+## Unit strings from real headers
+
+`u.Unit()` can silently misread pipeline unit strings. Map them explicitly (`UNIT_ALIASES` in the template):
+
+| Header string | Parses as | Use |
+|---|---|---|
+| `ergs s-1 cm-2 A-1` (Spextool `YUNITS`) | erg / (**ampere** s cm2), with no error! | `erg s-1 cm-2 Angstrom-1` |
+| `ergss-1cm-2A-1` | parse error | `erg s-1 cm-2 Angstrom-1` |
+| `Wm-2um-1` | parse error | `W m-2 um-1` |
+| `microns` | parse error | `um` |
+
+`check_spectrum_plottable` would reject the ampere version as an unknown flux type, so this shows up
+as `not_plottable` rather than as a wrong unit. Check `YUNITS` first when that happens.
+
 ---
 
 ## `astrodb_utils.fits`
@@ -108,6 +128,7 @@ Convert to degrees and set `RA_TARG`/`DEC_TARG` first.
 | `all_nan` | flux entirely NaN/inf | file is broken; ask for a new copy |
 | `ambiguous_date` | non-ISO header date | ask which date is correct |
 | `missing_date` | no date anywhere | ask; Spectra PK requires it |
+| `missing_metadata` | no metadata row / source name for the file | add the file to the metadata table |
 | `load_failed` | loader raised (wrong layout/columns) | re-inspect; adjust loader |
 | `exists` | output exists, `OVERWRITE=False` | confirm before overwriting |
 | `roundtrip_mismatch` | flux read back ≠ written | investigate; do not ingest |
